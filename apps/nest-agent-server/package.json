@@ -1,5 +1,5 @@
 {
-  "name": "@lil-el/nest-agent",
+  "name": "nest-agent-server",
   "version": "0.0.1",
   "description": "",
   "author": "",
@@ -20,9 +20,14 @@
     "test:e2e": "jest --config ./test/jest-e2e.json"
   },
   "dependencies": {
+    "@langchain/core": "^1.1.38",
+    "@langchain/openai": "^1.4.1",
     "@nestjs/common": "^11.0.1",
+    "@nestjs/config": "^4.0.3",
     "@nestjs/core": "^11.0.1",
+    "@nestjs/mapped-types": "*",
     "@nestjs/platform-express": "^11.0.1",
+    "@nestjs/serve-static": "^5.0.4",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1"
   },
