@@ -31,12 +31,16 @@ MVC 架构：
 - 3. ai2: sse 流式返回AI响应
   - web 搜索、邮件发送、数据库操作、定时任务
   - job: 定时任务
+- 4. nls: Natural Language Speech 自然语言语音
 
-### 模块引用
+### Nest
+
+1.模块引用
 
 **在 cron 中使用 book**
 
-> app.module 中导入了 cron 和 book module，但是 cron 和 book 直接是相互隔离的
+> app.module 中导入了 cron 和 book 等许多 module，是为了创建路由以及全局的配置；
+> 但是 每个模块之间 是相互隔离的；
 
 - 在 `book.module` 中导出 `export book.service`
 - 在 `cron` 中使用 `bookService` 时，需要在 `cron.module` 中导入 `book.module`
@@ -46,6 +50,18 @@ MVC 架构：
 
 - 在 `book.module` 中不导出 `export book.service`
 - 在 `cron.module` 中直接提供 `provide book.service`
+
+2.动态模块
+
+**创建动态模块 `cloud`**
+
+`cloud.module.ts` 中返回的模块，会替代 `@Module({})` 的模块；
+
+**global**
+
+当动态模块设置为 `global:true` 时，其他模块可以直接引入模块的 `provider`: `@Inject(AliCloudService)`
+
+如果没有设置 `global:true`，则其他模块需要 `import` 动态模块时，`imports:[AliCloudModule]` 导入的只是一个类，需要在这里加入配置才可以使用：`imports:[AliCloudModule.forRoot({...})]`
 
 ## Cron 表达式
 

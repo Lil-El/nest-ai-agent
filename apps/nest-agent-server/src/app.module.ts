@@ -13,8 +13,10 @@ import { UsersModule } from "./users/users.module";
 import { User } from "./users/entities/user.entity";
 import { CronExpression, ScheduleModule, SchedulerRegistry } from "@nestjs/schedule";
 import { CronJob } from "cron";
-import { JobModule } from './job/job.module';
+import { JobModule } from "./job/job.module";
 import { Job } from "./job/entities/job.entity";
+import { NlsModule } from "./nls/nls.module";
+import { AliCloudModule } from "./cloud/cloud.module";
 
 @Module({
   imports: [
@@ -58,11 +60,25 @@ import { Job } from "./job/entities/job.entity";
         };
       },
     }),
+    // 这里也可以使用 ConfigService 配置，为了学习动态模块，所以创建了单独的模块
+    AliCloudModule.forRootAsync({
+      // isGlobal: true,
+      inject: [ConfigService],
+      useFactory: (configService: ConfigService) => {
+        return {
+          accessKeyId: configService.getOrThrow("ALI_CLOUD_ACCESS_KEY_ID"),
+          accessKeySecret: configService.getOrThrow("ALI_CLOUD_ACCESS_KEY_SECRET"),
+          endPoint: configService.getOrThrow("ALI_CLOUD_END_POINT"),
+          nlsKey: configService.getOrThrow("ALI_CLOUD_NLS_API_KEY"),
+        };
+      },
+    }),
     BookModule,
     AiModule,
     Ai2Module,
     UsersModule,
     JobModule,
+    NlsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
