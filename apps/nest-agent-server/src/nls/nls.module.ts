@@ -3,6 +3,14 @@ import { NlsService } from "./nls.service";
 import { NlsController } from "./nls.controller";
 import { AliCloudModule } from "src/cloud/cloud.module";
 import { ConfigService } from "@nestjs/config";
+import { NlsWsGateway } from "./nls.gateway";
+import { AiModule } from "src/ai/ai.module";
+
+/**
+ * 访问 /ws-tts.html 可以多人对话，将文字转为语音，广播给其他人
+ *
+ * 访问 /asr.html 可以录音，识别文字
+ */
 
 @Module({
   imports: [
@@ -17,8 +25,9 @@ import { ConfigService } from "@nestjs/config";
         };
       },
     }),
+    AiModule
   ],
   controllers: [NlsController],
-  providers: [NlsService],
+  providers: [NlsService, NlsWsGateway],
 })
 export class NlsModule {}

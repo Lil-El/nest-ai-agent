@@ -1,16 +1,34 @@
-import { Controller, Get, Header, Inject, Query, Res, StreamableFile } from "@nestjs/common";
+import {
+  BadRequestException,
+  Controller,
+  Get,
+  Header,
+  Inject,
+  Post,
+  Query,
+  Res,
+  StreamableFile,
+  UploadedFile,
+  UseInterceptors,
+} from "@nestjs/common";
+import { FileInterceptor } from "@nestjs/platform-express";
 import { NlsService } from "./nls.service";
 import type { Response } from "express";
 import fs from "fs";
 import { join } from "path";
 import { Readable } from "stream";
+import { AiService } from "src/ai/ai.service";
 
 @Controller("nls")
 export class NlsController {
+  @Inject(AiService)
+  private readonly aiService: AiService;
+
   @Inject(NlsService)
   private readonly nlsService: NlsService;
 
   // https://help.aliyun.com/zh/isi/developer-reference/sdk-for-node-js-1
+  // 语音合成
   @Get("tts")
   async textToSpeech(@Query("text") text: string, @Res() res: Response) {
     if (!text) {
@@ -35,6 +53,7 @@ export class NlsController {
   }
 
   // https://help.aliyun.com/zh/isi/developer-reference/stream-input-tts-sdk-quick-start
+  // 流式语音合成
   @Get("tts-stream")
   @Header("Content-Type", "audio/mpeg")
   @Header("Transfer-Encoding", "chunked")
@@ -49,18 +68,18 @@ export class NlsController {
       "我和M先生商量过后，索性转进了旁边的魏家凉皮，点了两份以前就想吃的汉堡，外带凉皮和沙棘汁。",
     ];
 
-    /**
-     * 将文本转为语音，写入文件
-        const filePath = join(__dirname, "../../public/text.mp3");
+    /*
+      // 将文本转为语音，写入文件
+      const filePath = join(__dirname, "../../public/text.mp3");
 
-        const stream = fs.createWriteStream(filePath, { flags: "a" });
+      const stream = fs.createWriteStream(filePath, { flags: "a" });
 
-        for (const text of textArr) {
-          const buffer = await this.nlsService.textToSpeech(text);
-          stream.write(buffer);
-        }
+      for (const text of textArr) {
+        const buffer = await this.nlsService.textToSpeech(text);
+        stream.write(buffer);
+      }
 
-        stream.end();
+      stream.end();
     */
 
     async function* generateAudio() {
@@ -74,5 +93,30 @@ export class NlsController {
     return new StreamableFile(audioStream, {
       type: "audio/mpeg",
     });
+  }
+
+  // 语音识别
+  @Get("asr")
+  async asr(): Promise<string> {
+    const audioPath = join(__dirname, "../../public/audio.mp3");
+    // return this.nlsService.asrStream(audioPath);
+    return this.nlsService.asrStream(await fs.readFileSync(audioPath));
+  }
+
+  // @Get("chat")
+  // async chat(@Query("text") text: string): Promise<string> {
+  //   return this.aiService.invoke(text);
+  // }
+
+  @Post("asr")
+  @UseInterceptors(FileInterceptor("audio"))
+  async recognize(@UploadedFile() file?: any) {
+    console.log("file:", file);
+    if (file?.buffer?.length) {
+      const text = await this.nlsService.asrStream(file.buffer);
+      return { text };
+    } else {
+      throw new BadRequestException("请上传音频文件");
+    }
   }
 }

@@ -27,12 +27,12 @@ MVC 架构：
 
 ## 模块
 
-- 1. book：nest 基础使用
-- 2. ai: sse 流式返回AI响应
-- 3. ai2: sse 流式返回AI响应
-  - web 搜索、邮件发送、数据库操作、定时任务
-  - job: 定时任务
-- 4. nls: Natural Language Speech 自然语言语音
+1. book：nest 基础使用
+2. ai: sse 流式返回AI响应
+3. ai2: sse 流式返回AI响应
+    - web 搜索、邮件发送、数据库操作、定时任务
+    - job: 定时任务
+4. nls: Natural Language Speech 自然语言语音
 
 ### Nest
 

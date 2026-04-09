@@ -28,6 +28,6 @@ const llmProvider = {
   imports: [ToolModule],
   controllers: [AiController],
   providers: [AiService /* , llmProvider */],
-  // exports: [llmProvider], // 如果要在其他模块中使用 AiService，需要导出它
+  exports: [AiService], // 如果要在其他模块中使用 AiService，需要导出它
 })
 export class AiModule {}
