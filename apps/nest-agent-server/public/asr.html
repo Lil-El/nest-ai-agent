@@ -5,7 +5,7 @@
 
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-    <title>ASR 录音测试</title>
+    <title>ASR 录音 - record.ogg</title>
 
     <style>
       body {
@@ -52,17 +52,20 @@
 
       let mediaRecorder = null;
       let chunks = [];
-      const recordFilename = "record.ogg";
+      const recordFilename = "record.webm";
 
       function setStatus(text) {
         statusEl.textContent = "状态：" + text;
       }
 
+      // 访问 audio.mime-typs.html 查看支持的 MIME 类型
       startBtn.addEventListener("click", async () => {
         try {
           const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
           chunks = [];
-          const preferredMimeType = "audio/ogg;codecs=opus";
+
+          // 容器格式/编码器；简写：audio/webm
+          const preferredMimeType = "audio/webm;codecs=opus";
           mediaRecorder = MediaRecorder.isTypeSupported(preferredMimeType)
             ? new MediaRecorder(stream, { mimeType: preferredMimeType })
             : new MediaRecorder(stream);
@@ -122,6 +125,242 @@
         startBtn.disabled = false;
         stopBtn.disabled = true;
       });
+
+      /**
+       * 检测手机浏览器支持的音频 MIME 类型
+       * 按优先级和兼容性排序，优先推荐压缩格式以节省流量
+       * @returns {string|null} 支持的 MIME 类型，如 'audio/webm;codecs=opus' 或 null
+       */
+      function getMobileSupportedAudioMimeType() {
+        // 检查 MediaRecorder 是否存在
+        if (typeof MediaRecorder === "undefined" || typeof MediaRecorder.isTypeSupported !== "function") {
+          console.error("浏览器不支持 MediaRecorder API");
+          return null;
+        }
+
+        // 获取用户代理信息
+        const ua = navigator.userAgent.toLowerCase();
+        alert(ua)
+        const isIOS = /iphone|ipad|ipod/.test(ua);
+        const isAndroid = /android/.test(ua);
+        const isChrome = /chrome|crios/.test(ua);
+        const isFirefox = /firefox|fxios/.test(ua);
+        const isSafari = /safari/.test(ua) && !/chrome/.test(ua);
+        const isEdge = /edg/.test(ua);
+        const isSamsung = /samsung/.test(ua);
+        const isWechat = /micromessenger/.test(ua);
+        const isDingTalk = /dingtalk/.test(ua);
+        const isAlipay = /alipay/.test(ua);
+        const isQQ = /qq/.test(ua);
+        const isUC = /ucbrowser/.test(ua);
+
+        // 定义所有要检测的格式，按优先级排序
+        const formatTests = [
+          // 第1优先级：Opus编码 (最佳质量/大小比)
+          {
+            name: "WebM Opus",
+            mimeType: "audio/webm;codecs=opus",
+            description: "Chrome/Firefox/Edge 推荐，高质量低延迟",
+            priority: 100,
+          },
+          {
+            name: "WebM Opus (无参数)",
+            mimeType: "audio/webm",
+            description: "WebM 容器默认 Opus",
+            priority: 95,
+          },
+          {
+            name: "OGG Opus",
+            mimeType: "audio/ogg;codecs=opus",
+            description: "Firefox/Chrome 支持",
+            priority: 90,
+          },
+
+          // 第2优先级：AAC编码 (iOS/Safari首选)
+          {
+            name: "MP4 AAC",
+            mimeType: "audio/mp4;codecs=mp4a.40.2",
+            description: "iOS/Safari 首选，通用兼容",
+            priority: 85,
+          },
+          {
+            name: "MP4 AAC-LC",
+            mimeType: "audio/mp4;codecs=mp4a.40.5",
+            description: "AAC-LC 低复杂度",
+            priority: 80,
+          },
+          {
+            name: "MP4 (无codecs)",
+            mimeType: "audio/mp4",
+            description: "MP4 容器",
+            priority: 75,
+          },
+
+          // 第3优先级：PCM/WAV (无损，但文件大)
+          {
+            name: "WAV PCM",
+            mimeType: "audio/wav",
+            description: "无损音频，通用兼容但文件大",
+            priority: 70,
+          },
+          {
+            name: "WAV (旧格式)",
+            mimeType: "audio/x-wav",
+            description: "旧式 WAV",
+            priority: 65,
+          },
+          {
+            name: "AIFF PCM",
+            mimeType: "audio/aiff",
+            description: "苹果无损格式",
+            priority: 60,
+          },
+
+          // 第4优先级：MP3 (通用但效率较低)
+          {
+            name: "MP3",
+            mimeType: "audio/mpeg",
+            description: "通用 MP3 格式",
+            priority: 55,
+          },
+
+          // 第5优先级：Speex (语音优化)
+          {
+            name: "OGG Speex",
+            mimeType: "audio/ogg;codecs=speex",
+            description: "语音优化编码",
+            priority: 50,
+          },
+          {
+            name: "WebM Speex",
+            mimeType: "audio/webm;codecs=speex",
+            description: "WebM 中的 Speex",
+            priority: 45,
+          },
+
+          // 第6优先级：AMR (移动网络优化)
+          {
+            name: "AMR",
+            mimeType: "audio/amr",
+            description: "移动网络语音格式",
+            priority: 40,
+          },
+          {
+            name: "AMR-WB",
+            mimeType: "audio/amr-wb",
+            description: "宽带 AMR",
+            priority: 35,
+          },
+
+          // 第7优先级：其他格式
+          {
+            name: "OGG Vorbis",
+            mimeType: "audio/ogg;codecs=vorbis",
+            description: "OGG Vorbis 编码",
+            priority: 30,
+          },
+          {
+            name: "FLAC",
+            mimeType: "audio/flac",
+            description: "无损压缩",
+            priority: 25,
+          },
+          {
+            name: "OGG (无codecs)",
+            mimeType: "audio/ogg",
+            description: "OGG 容器",
+            priority: 20,
+          },
+        ];
+
+        // 按平台优化检测顺序
+        if (isIOS) {
+          // iOS 优先级调整
+          formatTests.sort((a, b) => {
+            // iOS 首选 AAC/MP4
+            if (a.mimeType.includes("mp4") && !b.mimeType.includes("mp4")) return -1;
+            if (!a.mimeType.includes("mp4") && b.mimeType.includes("mp4")) return 1;
+            return b.priority - a.priority;
+          });
+        } else if (isAndroid) {
+          // Android 优先级调整
+          formatTests.sort((a, b) => {
+            // Android 首选 WebM/OGG Opus
+            if (
+              a.mimeType.includes("webm") &&
+              a.mimeType.includes("opus") &&
+              !(b.mimeType.includes("webm") && b.mimeType.includes("opus"))
+            )
+              return -1;
+            if (
+              !(a.mimeType.includes("webm") && a.mimeType.includes("opus")) &&
+              b.mimeType.includes("webm") &&
+              b.mimeType.includes("opus")
+            )
+              return 1;
+            return b.priority - a.priority;
+          });
+        } else {
+          // 按默认优先级排序
+          formatTests.sort((a, b) => b.priority - a.priority);
+        }
+
+        console.log("开始检测支持的音频格式...");
+        const supportedFormats = [];
+
+        // 检测所有格式
+        for (const format of formatTests) {
+          try {
+            if (MediaRecorder.isTypeSupported(format.mimeType)) {
+              supportedFormats.push({
+                mimeType: format.mimeType,
+                name: format.name,
+                description: format.description,
+                priority: format.priority,
+              });
+              console.log(`✅ ${format.name}: ${format.mimeType}`);
+            } else {
+              console.log(`❌ ${format.name}: ${format.mimeType}`);
+            }
+          } catch (error) {
+            console.log(`⚠️ ${format.name} 检测异常:`, error.message);
+          }
+        }
+
+        if (supportedFormats.length === 0) {
+          console.warn("⚠️ 没有检测到任何支持的音频格式");
+          return null;
+        }
+
+        // 显示所有支持的格式
+        console.log("\n=== 所有支持的格式 ===");
+        supportedFormats.forEach((format, index) => {
+          console.log(`${index + 1}. ${format.name}: ${format.mimeType}`);
+        });
+
+        // 选择最佳格式
+        let bestFormat = supportedFormats[0];
+
+        // 特殊浏览器优化
+        if (isIOS && isSafari) {
+          // iOS Safari 首选 AAC
+          const aacFormat = supportedFormats.find((f) => f.mimeType.includes("mp4a.40"));
+          if (aacFormat) bestFormat = aacFormat;
+        }
+
+        // 在微信/QQ等内置浏览器中，优先选择通用格式
+        if (isWechat || isQQ || isAlipay || isDingTalk) {
+          const commonFormat = supportedFormats.find((f) => f.mimeType.includes("mp4") || f.mimeType === "audio/mpeg");
+          if (commonFormat) bestFormat = commonFormat;
+        }
+
+        console.log("\n=== 选择的格式 ===");
+        console.log(`最佳格式: ${bestFormat.name}`);
+        console.log(`MIME 类型: ${bestFormat.mimeType}`);
+        console.log(`描述: ${bestFormat.description}`);
+
+        return bestFormat.mimeType;
+      }
     </script>
   </body>
 </html>

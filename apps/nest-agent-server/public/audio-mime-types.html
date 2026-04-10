@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>音频 MIME Type 支持检测</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2em;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            opacity: 0.9;
+            font-size: 1.1em;
+        }
+
+        .content {
+            padding: 30px;
+        }
+
+        .info-section {
+            background: #f8f9fa;
+            border-left: 4px solid #667eea;
+            padding: 15px 20px;
+            margin-bottom: 25px;
+            border-radius: 4px;
+        }
+
+        .info-section h3 {
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+
+        .info-section p {
+            color: #666;
+            line-height: 1.6;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        thead {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        th {
+            padding: 15px;
+            text-align: left;
+            font-weight: 600;
+        }
+
+        td {
+            padding: 12px 15px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        tbody tr:hover {
+            background-color: #f5f5f5;
+            transition: background-color 0.2s ease;
+        }
+
+        .supported {
+            color: #28a745;
+            font-weight: bold;
+        }
+
+        .not-supported {
+            color: #dc3545;
+            font-weight: bold;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 0.85em;
+            font-weight: 600;
+        }
+
+        .badge-success {
+            background-color: #d4edda;
+            color: #155724;
+        }
+
+        .badge-danger {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+
+        .summary {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 25px;
+        }
+
+        .summary-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .summary-card h4 {
+            font-size: 2em;
+            margin-bottom: 5px;
+        }
+
+        .summary-card p {
+            opacity: 0.9;
+            font-size: 0.9em;
+        }
+
+        .category-header {
+            background-color: #e9ecef;
+            font-weight: bold;
+            color: #495057;
+        }
+
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 1.5em;
+            }
+
+            .content {
+                padding: 15px;
+            }
+
+            table {
+                font-size: 0.9em;
+            }
+
+            th, td {
+                padding: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎵 音频 MIME Type 支持检测</h1>
+            <p>检测当前浏览器/设备支持的音频格式</p>
+        </div>
+
+        <div class="content">
+            <div class="info-section">
+                <h3>📋 说明</h3>
+                <p>本页面使用 MediaRecorder API 的 <code>isTypeSupported()</code> 方法来检测您的浏览器是否支持各种音频 MIME 类型。结果仅供参考，实际录制能力可能因设备和浏览器版本而异。</p>
+            </div>
+
+            <div class="summary" id="summary">
+                <!-- 统计信息将在这里动态生成 -->
+            </div>
+
+            <table id="mimeTable">
+                <thead>
+                    <tr>
+                        <th>MIME Type</th>
+                        <th>描述</th>
+                        <th>支持状态</th>
+                    </tr>
+                </thead>
+                <tbody id="tableBody">
+                    <!-- 数据将在这里动态生成 -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        // 定义要检测的音频 MIME 类型
+        const audioMimeTypes = [
+            // WebM 格式
+            { mime: 'audio/webm', description: 'WebM 音频 (默认)' },
+            { mime: 'audio/webm;codecs=opus', description: 'WebM + Opus 编码' },
+            { mime: 'audio/webm;codecs=vorbis', description: 'WebM + Vorbis 编码' },
+            
+            // MP4 格式
+            { mime: 'audio/mp4', description: 'MP4 音频' },
+            { mime: 'audio/mp4;codecs=aac', description: 'MP4 + AAC 编码' },
+            { mime: 'audio/mp4;codecs=mp4a.40.2', description: 'MP4 + AAC-LC 编码' },
+            { mime: 'audio/mp4;codecs=mp4a.40.5', description: 'MP4 + HE-AAC 编码' },
+            
+            // Ogg 格式
+            { mime: 'audio/ogg', description: 'Ogg 音频' },
+            { mime: 'audio/ogg;codecs=opus', description: 'Ogg + Opus 编码' },
+            { mime: 'audio/ogg;codecs=vorbis', description: 'Ogg + Vorbis 编码' },
+            
+            // WAV 格式
+            { mime: 'audio/wav', description: 'WAV 音频' },
+            { mime: 'audio/wave', description: 'WAVE 音频 (别名)' },
+            { mime: 'audio/x-wav', description: 'WAV 音频 (扩展名)' },
+            
+            // MP3 格式
+            { mime: 'audio/mpeg', description: 'MP3 音频' },
+            { mime: 'audio/mp3', description: 'MP3 音频 (别名)' },
+            
+            // FLAC 格式
+            { mime: 'audio/flac', description: 'FLAC 无损音频' },
+            { mime: 'audio/x-flac', description: 'FLAC 音频 (扩展名)' },
+            
+            // 其他格式
+            { mime: 'audio/aac', description: 'AAC 音频' },
+            { mime: 'audio/amr', description: 'AMR 窄带音频' },
+            { mime: 'audio/amr-wb', description: 'AMR 宽带音频' },
+            { mime: 'audio/3gpp', description: '3GPP 音频' },
+            { mime: 'audio/3gpp2', description: '3GPP2 音频' },
+        ];
+
+        // 检测 MIME 类型支持情况
+        function checkMimeTypeSupport(mimeType) {
+            if (typeof MediaRecorder === 'undefined') {
+                return false;
+            }
+            return MediaRecorder.isTypeSupported(mimeType);
+        }
+
+        // 渲染表格
+        function renderTable() {
+            const tableBody = document.getElementById('tableBody');
+            let supportedCount = 0;
+            let notSupportedCount = 0;
+
+            // 按类别分组
+            const categories = {
+                'WebM 格式': [],
+                'MP4/M4A 格式': [],
+                'Ogg 格式': [],
+                'WAV 格式': [],
+                'MP3 格式': [],
+                'FLAC 格式': [],
+                '其他格式': []
+            };
+
+            audioMimeTypes.forEach(item => {
+                const isSupported = checkMimeTypeSupport(item.mime);
+                if (isSupported) {
+                    supportedCount++;
+                } else {
+                    notSupportedCount++;
+                }
+
+                // 分类
+                if (item.mime.includes('webm')) {
+                    categories['WebM 格式'].push({ ...item, supported: isSupported });
+                } else if (item.mime.includes('mp4') || item.mime.includes('aac')) {
+                    categories['MP4/M4A 格式'].push({ ...item, supported: isSupported });
+                } else if (item.mime.includes('ogg')) {
+                    categories['Ogg 格式'].push({ ...item, supported: isSupported });
+                } else if (item.mime.includes('wav') || item.mime.includes('wave')) {
+                    categories['WAV 格式'].push({ ...item, supported: isSupported });
+                } else if (item.mime.includes('mpeg') || item.mime.includes('mp3')) {
+                    categories['MP3 格式'].push({ ...item, supported: isSupported });
+                } else if (item.mime.includes('flac')) {
+                    categories['FLAC 格式'].push({ ...item, supported: isSupported });
+                } else {
+                    categories['其他格式'].push({ ...item, supported: isSupported });
+                }
+            });
+
+            // 渲染表格行
+            Object.entries(categories).forEach(([category, items]) => {
+                if (items.length > 0) {
+                    // 添加类别标题行
+                    const categoryRow = document.createElement('tr');
+                    categoryRow.innerHTML = `<td colspan="3" class="category-header">${category}</td>`;
+                    tableBody.appendChild(categoryRow);
+
+                    // 添加该类别下的所有项目
+                    items.forEach(item => {
+                        const row = document.createElement('tr');
+                        const statusClass = item.supported ? 'supported' : 'not-supported';
+                        const badgeClass = item.supported ? 'badge-success' : 'badge-danger';
+                        const statusText = item.supported ? '✓ 支持' : '✗ 不支持';
+
+                        row.innerHTML = `
+                            <td><code>${item.mime}</code></td>
+                            <td>${item.description}</td>
+                            <td>
+                                <span class="badge ${badgeClass}">${statusText}</span>
+                            </td>
+                        `;
+                        tableBody.appendChild(row);
+                    });
+                }
+            });
+
+            // 更新统计信息
+            updateSummary(supportedCount, notSupportedCount);
+        }
+
+        // 更新统计摘要
+        function updateSummary(supported, notSupported) {
+            const summaryDiv = document.getElementById('summary');
+            const total = supported + notSupported;
+            const percentage = total > 0 ? Math.round((supported / total) * 100) : 0;
+
+            summaryDiv.innerHTML = `
+                <div class="summary-card">
+                    <h4>${total}</h4>
+                    <p>检测总数</p>
+                </div>
+                <div class="summary-card" style="background: linear-gradient(135deg, #28a745 0%, #20c997 100%);">
+                    <h4>${supported}</h4>
+                    <p>支持的格式</p>
+                </div>
+                <div class="summary-card" style="background: linear-gradient(135deg, #dc3545 0%, #fd7e14 100%);">
+                    <h4>${notSupported}</h4>
+                    <p>不支持的格式</p>
+                </div>
+                <div class="summary-card" style="background: linear-gradient(135deg, #17a2b8 0%, #6f42c1 100%);">
+                    <h4>${percentage}%</h4>
+                    <p>支持率</p>
+                </div>
+            `;
+        }
+
+        // 页面加载完成后执行
+        document.addEventListener('DOMContentLoaded', () => {
+            // 检查浏览器是否支持 MediaRecorder
+            if (typeof MediaRecorder === 'undefined') {
+                document.getElementById('tableBody').innerHTML = `
+                    <tr>
+                        <td colspan="3" style="text-align: center; padding: 30px; color: #dc3545;">
+                            ⚠️ 您的浏览器不支持 MediaRecorder API，无法检测音频 MIME 类型支持情况。
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            renderTable();
+        });
+    </script>
+</body>
+</html>

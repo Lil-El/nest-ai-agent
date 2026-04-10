@@ -15,9 +15,11 @@ import { FileInterceptor } from "@nestjs/platform-express";
 import { NlsService } from "./nls.service";
 import type { Response } from "express";
 import fs from "fs";
-import { join } from "path";
-import { Readable } from "stream";
+
+import { Readable, PassThrough } from "stream";
 import { AiService } from "src/ai/ai.service";
+import ffmpeg from "fluent-ffmpeg";
+import { join } from "path";
 
 @Controller("nls")
 export class NlsController {
@@ -26,6 +28,11 @@ export class NlsController {
 
   @Inject(NlsService)
   private readonly nlsService: NlsService;
+
+  constructor() {
+    const ffmpegPath = require("@ffmpeg-installer/ffmpeg").path;
+    ffmpeg.setFfmpegPath(ffmpegPath);
+  }
 
   // https://help.aliyun.com/zh/isi/developer-reference/sdk-for-node-js-1
   // 语音合成
@@ -100,7 +107,7 @@ export class NlsController {
   async asr(): Promise<string> {
     const audioPath = join(__dirname, "../../public/audio.mp3");
     // return this.nlsService.asrStream(audioPath);
-    return this.nlsService.asrStream(await fs.readFileSync(audioPath));
+    return this.nlsService.asrStream(await fs.readFileSync(audioPath), "mp3");
   }
 
   // @Get("chat")
@@ -111,12 +118,65 @@ export class NlsController {
   @Post("asr")
   @UseInterceptors(FileInterceptor("audio"))
   async recognize(@UploadedFile() file?: any) {
-    console.log("file:", file);
+    // asr.html 采用的是 webm/opus 格式
+
+    // 保存录音文件:
+    // const savePath = join(__dirname, "../../public", file.originalname);
+    // await fs.writeFileSync(savePath, file.buffer);
+
+    // 模拟一个录音文件
+    // const filePath = join(__dirname, "../../public", "record.webm");
+    // const buffer = fs.readFileSync(filePath);
+
+    const buffer = file.buffer;
+
     if (file?.buffer?.length) {
-      const text = await this.nlsService.asrStream(file.buffer);
-      return { text };
+      try {
+        // 将接口传过来的 webm 文件转换为 ogg
+        const oggBuffer = await this.convertWebmToOgg(buffer);
+
+        const text = await this.nlsService.asrStream(oggBuffer, "opus");
+        return { text };
+      } catch (error) {
+        console.error("NLS Error:", error);
+      }
     } else {
       throw new BadRequestException("请上传音频文件");
     }
+  }
+
+  async convertWebmToOgg(webmBuffer: Buffer): Promise<Buffer> {
+    return new Promise((resolve, reject) => {
+      // 创建可读流
+      const webmStream = new Readable();
+      webmStream.push(webmBuffer);
+      webmStream.push(null);
+
+      // 创建转换流
+      const outputStream = new PassThrough();
+      const chunks: Buffer[] = [];
+
+      // 收集数据
+      outputStream.on("data", (chunk) => chunks.push(chunk));
+      outputStream.on("end", () => {
+        const oggBuffer = Buffer.concat(chunks);
+        resolve(oggBuffer);
+      });
+      outputStream.on("error", reject);
+
+      // 使用 fluent-ffmpeg 转换
+      ffmpeg(webmStream)
+        .inputFormat("webm")
+        .toFormat("ogg")
+        .audioCodec("libopus")
+        .audioBitrate("128k")
+        .on("start", (commandLine) => {
+          console.log("开始转换:", commandLine);
+        })
+        .on("error", (err) => {
+          reject(new Error(`音频转换失败: ${err.message}`));
+        })
+        .pipe(outputStream, { end: true });
+    });
   }
 }

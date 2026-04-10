@@ -67,7 +67,8 @@ export class NlsService {
    * @param filePathOrFileBuffer 音频文件路径或文件 buffer
    * @returns 识别结果文本
    */
-  async asrStream(filePathOrFileBuffer: Buffer | string): Promise<string> {
+  async asrStream(filePathOrFileBuffer: Buffer | string, format: string): Promise<string> {
+    // 支持的输入格式：单声道（mono）、16 bit采样位数，包括PCM、PCM编码的WAV、OGG封装的OPUS、OGG封装的SPEEX、AMR、MP3、AAC。
     const fileBuffer =
       typeof filePathOrFileBuffer === "string" ? await readFileSync(filePathOrFileBuffer) : filePathOrFileBuffer;
 
@@ -86,10 +87,6 @@ export class NlsService {
 
     sr.on("closed", () => {});
 
-    sr.on("failed", (msg) => {
-      sr.shutdown();
-    });
-
     return new Promise((resolve, reject) => {
       sr.on("completed", (res) => {
         const { payload } = JSON.parse(res);
@@ -97,8 +94,14 @@ export class NlsService {
         resolve(payload.result);
       });
 
+      sr.on("failed", (msg) => {
+        sr.shutdown();
+        reject(JSON.parse(msg).header.status_text);
+      });
+
+      // 支持的音频格式，包括PCM、WAV、OPUS、SPEEX、AMR、MP3、AAC。
       const params = sr.defaultStartParams();
-      params.format = "mp3";
+      params.format = format;
 
       // 启动语音识别
       sr.start(params, true, 6000)
