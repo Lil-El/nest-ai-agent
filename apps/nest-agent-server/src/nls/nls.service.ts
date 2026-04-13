@@ -24,6 +24,9 @@ export class NlsService {
   private ttsQueues = new Map<string, Array<() => Promise<void>>>();
   private ttsProcessing = new Map<string, boolean>();
 
+  // 文本缓存
+  private textCache: string = "";
+
   addConnectClient(id, client: Socket) {
     this.connectClients.set(id, client);
   }
@@ -64,7 +67,7 @@ export class NlsService {
     });
 
     tts.on("closed", () => {
-      console.log("Client recv closed ");
+      console.log(`语音合成【${text}】结束`);
     });
 
     // 开始合成
@@ -179,42 +182,38 @@ export class NlsService {
 
     switch (event.type) {
       case "start": {
+        this.textCache = "";
         client.emit("tts-start", { messageId: event.messageId });
         break;
       }
       case "end": {
-        client.emit("tts-end", { messageId: event.messageId });
+        this.runTask(event.sessionId, this.textCache)
+          .then((buffer: Buffer) => {
+            client.emit("tts-chunk", {
+              type: "Buffer",
+              data: buffer,
+            });
+          })
+          .then(() => {
+            client.emit("tts-end", { messageId: event.messageId });
+          });
         break;
       }
       case "chunk": {
-        // 创建 TTS 任务
-        const ttsTask = async () => {
-          try {
-            const buffer = await this.textToSpeech(event.chunk);
-            const bufferArray = buffer;
-            if (bufferArray.length === 0) return void 0;
-
-            client.emit("speech_buffer", {
-              type: "Buffer",
-              data: bufferArray,
+        // 文本缓冲，以单行文本进行语音合成
+        this.textCache += event.chunk;
+        if (this.textCache.includes("\n")) {
+          const lines = this.textCache.split("\n");
+          for (const lineText of lines.slice(0, -1)) {
+            this.runTask(event.sessionId, lineText).then((buffer: Buffer) => {
+              client.emit("tts-chunk", {
+                type: "Buffer",
+                data: buffer,
+                messageId: event.messageId,
+              });
             });
-          } catch (error) {
-            console.error(`TTS failed for session ${event.sessionId}:`, error);
-          } finally {
-            // 处理队列中的下一个任务
-            this.processNextTtsTask(event.sessionId);
           }
-        };
-
-        // 将任务加入队列
-        if (!this.ttsQueues.has(event.sessionId)) {
-          this.ttsQueues.set(event.sessionId, []);
-        }
-        this.ttsQueues.get(event.sessionId)!.push(ttsTask);
-
-        // 如果当前没有正在处理的任务,则开始处理队列
-        if (!this.ttsProcessing.get(event.sessionId)) {
-          this.processNextTtsTask(event.sessionId);
+          this.textCache = lines.at(-1)!;
         }
 
         break;
@@ -222,6 +221,38 @@ export class NlsService {
       default: {
       }
     }
+  }
+
+  private runTask(sessionId: string, text: string) {
+    return new Promise<Buffer>((resolve, reject) => {
+      const client = this.connectClients.get(sessionId);
+      if (!client) return;
+
+      // 创建 TTS 任务
+      const ttsTask = async () => {
+        try {
+          const buffer = await this.textToSpeech(text);
+          resolve(buffer);
+        } catch (error) {
+          console.error(`TTS failed for session ${sessionId}:`, error);
+          reject(error);
+        } finally {
+          // 处理队列中的下一个任务
+          this.processNextTtsTask(sessionId);
+        }
+      };
+
+      // 将任务加入队列
+      if (!this.ttsQueues.has(sessionId)) {
+        this.ttsQueues.set(sessionId, []);
+      }
+      this.ttsQueues.get(sessionId)!.push(ttsTask);
+
+      // 如果当前没有正在处理的任务,则开始处理队列
+      if (!this.ttsProcessing.get(sessionId)) {
+        this.processNextTtsTask(sessionId);
+      }
+    });
   }
 
   /**

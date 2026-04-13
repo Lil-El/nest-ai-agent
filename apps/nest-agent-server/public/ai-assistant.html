@@ -250,10 +250,6 @@
           </div>
 
           <div class="hint">文字直问：/ai/chat/stream；语音链路：/nls/asr -> /ai/chat/stream</div>
-          <div class="audio-bar">
-            <span>AI 语音播放</span>
-            <audio id="ttsAudio" controls preload="none"></audio>
-          </div>
         </footer>
       </section>
     </main>
@@ -265,22 +261,23 @@
       const statusEl = document.getElementById("status");
       const messagesEl = document.getElementById("messages");
       const emptyTipEl = document.getElementById("emptyTip");
-      const ttsAudioEl = document.getElementById("ttsAudio");
 
       let mediaRecorder = null;
       let chunks = [];
       let activeStream = null;
       let activeAssistantContentEl = null;
       let activeAssistantMetaEl = null;
+      let activeAssistantRowEl = null;
       let activeRecordStream = null;
       let isRecording = false;
 
       let socket = null;
       let sessionId = null;
+
+      let ttsAudioBuffer = [];
       let ttsMediaSource = null;
-      let ttsSourceBuffer = null;
-      let ttsObjectUrl = null;
       let ttsPendingBuffers = [];
+      let ttsStreamFinal = false;
 
       function setStatus(text, isTyping = false) {
         statusEl.textContent = "状态：" + text;
@@ -361,8 +358,15 @@
           const aiMsg = appendMessage("assistant", "", "AI 正在回答...");
           activeAssistantContentEl = aiMsg.content;
           activeAssistantMetaEl = aiMsg.meta;
+          activeAssistantRowEl = aiMsg.row;
 
-          const url = "/ai/chat/stream?query=" + encodeURIComponent(query) + "&sessionId=" + sessionId;
+          const url =
+            "/ai/chat/stream?query=" +
+            encodeURIComponent(query) +
+            "&sessionId=" +
+            sessionId +
+            "&messageId=" +
+            Date.now();
           const es = new EventSource(url);
           let aiResult = "";
           activeStream = es;
@@ -430,7 +434,6 @@
         // 连接成功
         socket.on("connect", () => {
           sessionId = socket.id;
-          prepareStreamingAudio();
         });
 
         // 连接错误
@@ -443,21 +446,55 @@
           console.log("Disconnected:", reason);
         });
 
-        // 监听 speech_text 事件的响应 - 接收音频 buffer
-        socket.on("speech_buffer", (evt) => {
-          // 将接收到的数据转换为 Uint8Array
-          let buffer;
+        socket.on("tts-start", (evt) => {
+          ttsAudioBuffer = [];
+          ttsPendingBuffers = [];
+          ttsStreamFinal = false;
 
-          if (evt.data instanceof ArrayBuffer) {
-            ttsPendingBuffers.push(evt.data);
+          const audioElement = createAudioElement();
+          activeAssistantRowEl.appendChild(audioElement);
+
+          ttsMediaSource = new MediaSource();
+          audioElement.src = URL.createObjectURL(ttsMediaSource);
+
+          ttsMediaSource.addEventListener("sourceopen", () => {
+            console.log("sourceopen");
+            ttsAudioBuffer = ttsMediaSource.addSourceBuffer("audio/mpeg");
+            ttsAudioBuffer.mode = "sequence";
+
+            ttsAudioBuffer.addEventListener("updateend", () => {
+              console.log("updateend");
+              flushTtsBufferQueue();
+            });
             flushTtsBufferQueue();
-          }
+          });
         });
 
-        // 监听其他消息
-        socket.on("message", (data) => {
-          console.log("Received message:", data);
+        socket.on("tts-chunk", (evt) => {
+          // 直接appendBuffer时，会导致前面的buffer还没有处理完成，所以使用一个队列来缓存buffer
+          ttsPendingBuffers.push(evt.data);
+          flushTtsBufferQueue();
         });
+
+        socket.on("tts-end", (evt) => {
+          ttsStreamFinal = true;
+          flushTtsBufferQueue();
+        });
+      }
+
+      function flushTtsBufferQueue() {
+        if (ttsAudioBuffer.updating) return;
+
+        const next = ttsPendingBuffers.shift();
+        if (next) {
+          // 追加数据 => updateend 事件；递归触发 flushTtsBufferQueue 函数
+          ttsAudioBuffer.appendBuffer(next);
+        }
+
+        // 所有的数据都追加完成后，关闭 MediaSource
+        if (ttsStreamFinal && ttsMediaSource.readyState === "open") {
+          ttsMediaSource.endOfStream();
+        }
       }
 
       // 断开连接
@@ -470,77 +507,15 @@
         }
       }
 
-      function resetTtsPlayer() {
-        ttsPendingBuffers = [];
-        ttsSourceBuffer = null;
-        ttsMediaSource = null;
-        if (ttsObjectUrl) {
-          URL.revokeObjectURL(ttsObjectUrl);
-          ttsObjectUrl = null;
-        }
-        ttsAudioEl.pause();
-        ttsAudioEl.removeAttribute("src");
-        ttsAudioEl.load();
-      }
-
-      // 播放音频
-      function prepareStreamingAudio() {
-        resetTtsPlayer();
-        if (!window.MediaSource || !MediaSource.isTypeSupported("audio/mpeg")) {
-          return;
-        }
-
-        ttsMediaSource = new MediaSource();
-        ttsObjectUrl = URL.createObjectURL(ttsMediaSource);
-        ttsAudioEl.src = ttsObjectUrl;
-
-        ttsMediaSource.addEventListener("sourceopen", () => {
-          if (!ttsMediaSource) return;
-          ttsSourceBuffer = ttsMediaSource.addSourceBuffer("audio/mpeg");
-          ttsSourceBuffer.mode = "sequence";
-          ttsSourceBuffer.addEventListener("updateend", flushTtsBufferQueue);
-          flushTtsBufferQueue();
-        });
-      }
-
-      function flushTtsBufferQueue() {
-        if (!ttsSourceBuffer || !ttsMediaSource) return;
-        if (ttsSourceBuffer.updating) return;
-
-        // 检查 MediaSource 是否已经结束
-        if (ttsMediaSource.readyState !== "open") {
-          ttsPendingBuffers = [];
-          return;
-        }
-
-        if (ttsPendingBuffers.length > 0) {
-          const next = ttsPendingBuffers.shift();
-          if (next) {
-            try {
-              ttsSourceBuffer.appendBuffer(next);
-              ttsAudioEl.play().catch(() => {
-                // 静默处理自动播放限制
-                console.log("自动播放");
-              });
-            } catch (error) {
-              console.error("appendBuffer 失败:", error);
-              ttsPendingBuffers = [];
-            }
-          }
-          return;
-        }
-
-        // 只有在没有更多数据时才结束流
-        if (ttsMediaSource.readyState === "open") {
-          try {
-            // ttsMediaSource.endOfStream();
-          } catch {
-            // ignore
-          }
-        }
-      }
-
       connect();
+
+      // 创建播放按钮
+      function createAudioElement() {
+        const audioElement = document.createElement("audio");
+        audioElement.autoplay = true;
+
+        return audioElement;
+      }
 
       sendBtn.addEventListener("click", async () => {
         await askWithQuery(promptInput.value, "文字提问");

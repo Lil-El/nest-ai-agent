@@ -6,9 +6,10 @@ import { AI_TTS_STREAM_EVENT, AiTtsStreamEvent } from "src/common/stream-events"
 
 @Controller("ai")
 export class AiController {
-  private readonly eventEmitter: EventEmitter2;
-
-  constructor(private readonly aiService: AiService) {}
+  constructor(
+    private readonly aiService: AiService,
+    private readonly eventEmitter: EventEmitter2,
+  ) {}
 
   @Get("chat")
   async chat(@Query("query") query: string) {
@@ -28,6 +29,6 @@ export class AiController {
       this.eventEmitter.emit(AI_TTS_STREAM_EVENT, event);
     }
 
-    return from(this.aiService.stream(query, session)).pipe(map((chunk) => ({ data: chunk })));
+    return from(this.aiService.stream(query, session, messageId)).pipe(map((chunk) => ({ data: chunk })));
   }
 }
