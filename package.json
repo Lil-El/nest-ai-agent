@@ -1,5 +1,5 @@
 {
-  "name": "nest-ai-agent",
+  "name": "nest-agent",
   "version": "1.0.0",
   "main": "index.js",
   "type": "module",
@@ -8,14 +8,14 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Lil-El/nest-ai-agent.git"
+    "url": "git+https://github.com/Lil-El/nest-agent.git"
   },
   "keywords": [],
   "author": "Yaan.",
   "license": "ISC",
   "bugs": {
-    "url": "https://github.com/Lil-El/nest-ai-agent/issues"
+    "url": "https://github.com/Lil-El/nest-agent/issues"
   },
-  "homepage": "https://github.com/Lil-El/nest-ai-agent#readme",
+  "homepage": "https://github.com/Lil-El/nest-agent#readme",
   "description": ""
 }
