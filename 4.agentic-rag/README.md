@@ -24,3 +24,17 @@
 最终把原本 “死板的检索 - 生成” 流程，升级为可思考、可判断、可纠错的智能 RAG 架构。
 
 这种由大模型自主决策怎么检索、检索的信息是否足够、是否要重新检索等的 RAG 流程就叫 `Agentic RAG`。
+
+## GS 的公司项目 RAG 流程
+
+1.意图识别(可多意图): `route question` 先判定是CHAT_SEARCH/FEED_SEARCH/WEB_SEARCH
+
+2.计划生成:RetrievalPlanner 按意图选模板，每个模板定义固定 workflow_sequence
+
+3.多路执行:WorkflowExecutor并行跑多个workflow
+
+4.结果融合:按意图聚合、去重，回给上层再参与回答
+
+> 完整的 Agentic RAG 架构，计划阶段是由 LLM 生成的，
+> 而 GS 的公司项目 RAG 架构的 计划阶段 由预定义模板生成的。
+> GS 的决策链和多路执行与 Agentic RAG 流程很相似。
